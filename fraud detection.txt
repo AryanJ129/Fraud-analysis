@@ -1,0 +1,58 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, roc_auc_score
+
+# Load the dataset
+df = pd.read_csv(r"C:\Users\aryan\OneDrive\Desktop\Fraud.csv")
+
+# Check for missing values
+print(df.isnull().sum())
+
+# Plot boxplots for numeric columns to identify outliers
+numeric_cols = ['amount', 'oldbalanceOrg', 'newbalanceOrig', 'oldbalanceDest', 'newbalanceDest']
+for column in numeric_cols:
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x=df[column])
+    plt.title(f'Boxplot of {column}')
+    plt.show()
+
+# Convert categorical 'type' column to dummy variables
+df = pd.get_dummies(df, columns=['type'], drop_first=True)
+
+# Feature engineering: create new feature for balance difference
+df['balance_diff'] = df['oldbalanceOrg'] - df['newbalanceOrig']
+
+# Use a smaller sample of the data for initial testing
+df_sample = df.sample(n=100000, random_state=42)
+
+# Split data into features and target
+X_sample = df_sample.drop(columns=['isFraud', 'isFlaggedFraud', 'nameOrig', 'nameDest'])
+y_sample = df_sample['isFraud']
+
+# Train-test split
+X_train, X_val, y_train, y_val = train_test_split(X_sample, y_sample, test_size=0.3, stratify=y_sample, random_state=42)
+
+# Train a Random Forest classifier with optimized parameters
+rf = RandomForestClassifier(random_state=42, n_jobs=-1, n_estimators=100, max_depth=10, class_weight='balanced')
+rf.fit(X_train, y_train)
+
+# Predict on validation set
+y_pred = rf.predict(X_val)
+
+# Evaluate the model
+print(classification_report(y_val, y_pred))
+print("ROC-AUC Score:", roc_auc_score(y_val, y_pred))
+
+# Feature importance
+importances = rf.feature_importances_
+indices = np.argsort(importances)[::-1]
+
+plt.figure(figsize=(10, 6))
+plt.title("Feature Importances")
+plt.bar(range(X_train.shape[1]), importances[indices], align="center")
+plt.xticks(range(X_train.shape[1]), X_train.columns[indices], rotation=90)
+plt.show()
